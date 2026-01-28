@@ -1,7 +1,7 @@
 #!/bin/bash
 # 사용법: ./find_all.sh [경로] "검색어"
 
-# --- 1. 인자 파싱 (경로/검색어 구분) ---
+# --- 1. 인자 파싱 ---
 if [ "$#" -eq 2 ]; then
     TARGET_DIR="$1"
     SEARCH_TEXT="$2"
@@ -25,25 +25,23 @@ echo " 대상 경로: $TARGET_DIR"
 echo " 검색 내용: \"$SEARCH_TEXT\""
 echo "========================================================"
 
-# --- 2. 도구 확인 및 분기 (rg vs grep/zipgrep) ---
+# --- 2. 검색 실행 ---
 
 if command -v rg &> /dev/null; then
-    # [CASE A] rg(ripgrep)이 설치된 경우 (빠름)
-    echo ">> [도구] 'rg' (ripgrep)가 감지되었습니다. 고속 검색을 시작합니다."
+    # [CASE A] rg (ripgrep) 사용 - 고속 모드
+    echo ">> [도구] 'rg'로 검색합니다. (멀티라인 지원)"
     
     echo ""
-    echo "--- [1] 일반 파일 검색 (rg) ---"
-    # -n:줄번호, -i:대소문자무시, --glob:압축파일제외
-    rg -n -i "$SEARCH_TEXT" "$TARGET_DIR" --glob "!*.{jar,zip}"
+    echo "--- [1] 일반 파일 검색 ---"
+    # -U: 여러 줄(멀티라인) 매칭 허용
+    # --multiline-dotall: .이 엔터도 포함하게 함
+    rg -n -i -U --multiline-dotall "$SEARCH_TEXT" "$TARGET_DIR" --glob "!*.{jar,zip}"
     
     echo ""
-    echo "--- [2] 압축 파일 검색 (rg -z) ---"
-    # --- [2] 압축 파일 검색 (rg -z) --- [수정]
-    # -l: 내용 대신 '파일명'만 출력 (글자 깨짐 방지)
+    echo "--- [2] 압축 파일(.jar, .zip) 검색 ---"
     # -z: 압축 해제 검색
-    # -a: 모든 파일을 텍스트처럼 취급
-    rg -z -a -l -i "$SEARCH_TEXT" "$TARGET_DIR" --glob "*.{jar,zip}"
-
+    # -a: 바이너리도 텍스트로 취급
+    rg -z -i -a -U --multiline-dotall --with-filename "$SEARCH_TEXT" "$TARGET_DIR" --glob "*.{jar,zip}"
 else
     # [CASE B] rg가 없는 경우 -> grep + zipgrep 사용 (호환성)
     echo ">> [도구] 'rg'가 없습니다. 표준 도구(grep, zipgrep)로 전환합니다."
