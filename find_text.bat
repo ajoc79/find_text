@@ -1,74 +1,77 @@
 @echo off
 setlocal
-:: [사용법 1] find_all.bat "검색어"             (현재 폴더 검색)
-:: [사용법 2] find_all.bat "경로" "검색어"       (지정 경로 검색)
+:: [사용법] find_all.bat "검색어" 
+:: [기능] rg가 설치되어 있으면 일반 파일 검색에 rg를 사용(고속), 없으면 PowerShell 내장 기능 사용
 
-:: --- 인자 확인 로직 ---
-if "%~2"=="" (
-    :: 인자가 1개면 -> 현재 위치(.)에서 검색
-    set "TARGET_DIR=."
-    set "FIND_TEXT=%~1"
-) else (
-    :: 인자가 2개면 -> 첫번째는 경로, 두번째는 검색어
-    set "TARGET_DIR=%~1"
+set "FIND_TEXT=%~1"
+if "%FIND_TEXT%"=="" (
     set "FIND_TEXT=%~2"
+    set "TARGET_DIR=%~1"
+) else (
+    set "TARGET_DIR=."
 )
 
-:: 검색어 누락 확인
-if "%FIND_TEXT%"=="" goto Usage
+if "%FIND_TEXT%"=="" (
+    echo [사용법] find_all.bat "경로" "검색어"
+    goto :EOF
+)
 
-:: --- 네트워크 경로(UNC) 대응 (Z: 드라이브 매핑) ---
+:: 네트워크 경로 대응
 echo %~dp0 | findstr /B "\\" >nul
 if %errorlevel% equ 0 (
     if exist Z:\ net use Z: /delete /y >nul
-    :: 스크립트가 있는 위치를 Z:로 잡습니다.
     net use Z: "%~dp0." >nul
     Z:
 )
 
 echo ========================================================
 echo  대상 경로: %TARGET_DIR%
-echo  검색 내용: "%FIND_TEXT%" (대소문자 무시)
+echo  검색 내용: "%FIND_TEXT%"
 echo ========================================================
 
-:: --- PowerShell 실행 ---
 powershell -NoProfile -Command ^
-    "Add-Type -A System.IO.Compression.FileSystem;" ^
-    "$searchTxt = '%FIND_TEXT%';" ^
-    "$targetPath = '%TARGET_DIR%';" ^
+    "$path = '%TARGET_DIR%';" ^
+    "$txt = '%FIND_TEXT%';" ^
     "$cwd = (Get-Location).Path;" ^
-    "if ($targetPath -eq '.') { $targetPath = $cwd };" ^
-    "try { $files = Get-ChildItem -Path $targetPath -Recurse -Force -ErrorAction Stop } catch { Write-Warning '경로를 찾을 수 없거나 접근할 수 없습니다: ' + $targetPath; exit };" ^
+    "if ($path -eq '.') { $path = $cwd };" ^
+    "" ^
+    "# 1. rg 설치 여부 확인;" ^
+    "$hasRg = (Get-Command rg -ErrorAction SilentlyContinue) -ne $null;" ^
+    "if ($hasRg) { Write-Host '>> [가속 모드] ripgrep(rg)을 사용하여 일반 파일을 검색합니다.' -ForegroundColor Cyan } " ^
+    "else { Write-Host '>> [일반 모드] rg가 없어 PowerShell로 검색합니다. (속도 느림)' -ForegroundColor Yellow };" ^
+    "" ^
+    "# 2. 파일 순회 시작;" ^
+    "try { $files = Get-ChildItem -Path $path -Recurse -Force -ErrorAction Stop } catch { Write-Warning '경로 접근 불가'; exit };" ^
+    "" ^
     "foreach ($f in $files) {" ^
         "if ($f.Attributes -match 'Directory') { continue }" ^
         "try {" ^
-            ":: [1] 압축 파일(.jar, .zip) 내부 검색 ;" ^
+            "# [A] 압축 파일 (.jar, .zip) -> PowerShell 방식 유지 (가장 안정적);" ^
             "if ($f.Extension -match '\.(jar|zip)$') {" ^
                 "$zip = [IO.Compression.ZipFile]::OpenRead($f.FullName);" ^
                 "foreach($e in $zip.Entries) {" ^
                     "if($e.Name -match '\.(json|lang|txt|toml|yml|mcfunction)$') {" ^
                         "$s = $e.Open(); $r = New-Object IO.StreamReader($s); $t = $r.ReadToEnd();" ^
-                        "if($t -match $searchTxt) { Write-Host ('[ZIP내부] ' + $f.Name + ' -> ' + $e.FullName) -ForegroundColor Cyan };" ^
+                        "if($t -match $txt) { Write-Host ('[ZIP내부] ' + $f.Name + ' -> ' + $e.FullName) -ForegroundColor Green };" ^
                         "$r.Dispose(); $s.Dispose();" ^
                     "}" ^
                 "}" ^
                 "$zip.Dispose();" ^
             "}" ^
-            ":: [2] 일반 텍스트 파일 검색 ;" ^
+            "# [B] 일반 파일 -> rg 있으면 rg 사용, 없으면 PS 사용;" ^
             "elseif ($f.Extension -match '\.(json|lang|txt|toml|yml|mcfunction)$') {" ^
-                "$content = Get-Content $f.FullName -Raw -ErrorAction SilentlyContinue;" ^
-                "if($content -match $searchTxt) { Write-Host ('[파일] ' + $f.FullName) -ForegroundColor Green };" ^
+                "if ($hasRg) {" ^
+                    "# rg 사용 (외부 프로세스 호출);" ^
+                    "$args = @('-n', '-i', '--no-heading', $txt, $f.FullName);" ^
+                    "$res = & rg $args;" ^
+                    "if ($res) { Write-Host $res };" ^
+                "} else {" ^
+                    "# PS 사용;" ^
+                    "$c = Get-Content $f.FullName -Raw -ErrorAction SilentlyContinue;" ^
+                    "if($c -match $txt) { Write-Host ('[파일] ' + $f.FullName) -ForegroundColor White };" ^
+                "}" ^
             "}" ^
         "} catch {}" ^
     "}"
 
-:: --- 네트워크 드라이브 해제 ---
 if exist Z:\ ( c: & net use Z: /delete /y >nul )
-
-goto :EOF
-
-:Usage
-echo [사용법 오류]
-echo 1. 현재 폴더 검색: find_all.bat "검색어"
-echo 2. 특정 경로 검색: find_all.bat "폴더명" "검색어"
-pause
