@@ -30,3 +30,17 @@
       - source ~/.profile
   - 심볼릭 링크(Symbolic Link) 생성
       - sudo ln -s /volume2/docker/scripts/find_text/find_text.sh /usr/local/bin/find_text
+
+# alias 및 심볼릭 링크 변경
+1. .profile 수정 (Alias 변경)
+  - vi ~/.profile
+  - (파일 맨 아래에 있던 alias find_text=... 줄을 찾아 아래 내용으로 수정(덮어쓰기) 하세요.)
+  - alias find_text='python3 /volume2/docker/scripts/find_text/find_text_py.py'
+  - 저장 후 적용합니다:
+  - source ~/.profile
+2. 심볼릭 링크 변경
+  - sudo 권한으로 전역 명령어(find_text)를 만드셨다면, 기존 링크를 지우고 새로 연결해야 합니다.
+  - 기존 링크 삭제
+    - sudo rm /usr/local/bin/find_text
+  - 새 파이썬 파일로 링크 생성
+    - sudo ln -s /volume2/docker/scripts/find_text/find_text_py.py /usr/local/bin/find_text
