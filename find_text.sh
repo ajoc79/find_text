@@ -38,8 +38,10 @@ if command -v rg &> /dev/null; then
     
     echo ""
     echo "--- [2] 압축 파일 검색 (rg -z) ---"
-    # -z:압축해제검색
-    rg -z -i "$SEARCH_TEXT" "$TARGET_DIR" --glob "*.{jar,zip}"
+    # --- [2] 압축 파일 검색 (rg -z) --- [수정]
+    # -a: 바이너리 파일도 텍스트처럼 검색 (JAR 내부 JSON 검색에 필수)
+    # --with-filename: 어느 JAR 파일에서 찾았는지 표시
+    rg -z -i -a --with-filename "$SEARCH_TEXT" "$TARGET_DIR" --glob "*.{jar,zip}"
 
 else
     # [CASE B] rg가 없는 경우 -> grep + zipgrep 사용 (호환성)
