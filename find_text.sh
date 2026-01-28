@@ -35,7 +35,8 @@ if command -v rg &> /dev/null; then
     echo "--- [1] 일반 파일 검색 ---"
     # -U: 여러 줄(멀티라인) 매칭 허용
     # --multiline-dotall: .이 엔터도 포함하게 함
-    rg -n -i -U --multiline-dotall "$SEARCH_TEXT" "$TARGET_DIR" --glob "!*.{jar,zip}"
+    # [수정] -a 옵션 추가: 바이너리 파일(NBT, DAT 등)도 텍스트로 취급하여 검색
+    rg -n -i -a -U --multiline-dotall "$SEARCH_TEXT" "$TARGET_DIR" --glob "!*.{jar,zip}"
     
     echo ""
     echo "--- [2] 압축 파일(.jar, .zip) 검색 ---"
