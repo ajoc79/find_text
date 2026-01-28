@@ -15,4 +15,4 @@
   - ./find_text.sh mods/ "ancient wonders"
   - ./find_text.sh ./mods/ "ancient wonders"
 3. 절대 경로로 검색 (어디서든 실행 가능)
-  - ./find_text.sh /volume2/docker/mc_verse/data/mods/ "ancient wonders"
+  - ./find_text.sh /volume2/docker/lol/data/mods/ "ancient wonders"
