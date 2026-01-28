@@ -40,9 +40,23 @@ if command -v rg &> /dev/null; then
     
     echo ""
     echo "--- [2] 압축 파일(.jar, .zip) 검색 ---"
-    # -z: 압축 해제 검색
-    # -a: 바이너리도 텍스트로 취급
-    rg -z -i -a -U --multiline-dotall --with-filename "$SEARCH_TEXT" "$TARGET_DIR" --glob "*.{jar,zip}"
+    python3 -c "
+        import zipfile, os
+        target_dir = '$TARGET_DIR'
+        search_text = '$SEARCH_TEXT'
+        for root, dirs, files in os.walk(target_dir):
+            for file in files:
+                if file.endswith(('.zip', '.jar')):
+                    p = os.path.join(root, file)
+                    try:
+                        with zipfile.ZipFile(p) as z:
+                            for name in z.namelist():
+                                if name.endswith(('.json', '.lang', '.mcfunction', '.txt')):
+                                    content = z.read(name).decode('utf-8', 'ignore')
+                                    if search_text in content:
+                                        print(f'[발견] {p} -> {name}')
+                    except: pass
+            "
 else
     # [CASE B] rg가 없는 경우 -> grep + zipgrep 사용 (호환성)
     echo ">> [도구] 'rg'가 없습니다. 표준 도구(grep, zipgrep)로 전환합니다."
